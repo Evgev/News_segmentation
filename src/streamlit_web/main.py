@@ -1,48 +1,114 @@
-import requests
-from collections import deque
-import feedparser
-import time
+import sys
+import os
+
+sys.path.append(os.getcwd() + "/get_data_realtime/")
+sys.path.append(os.getcwd() + "/classificator/")
+
+
+import joblib  # Импортируем joblib для загрузки модели
+import pandas as pd
 import streamlit as st
+import threading
+from collections import deque
+from rbc_parser import rss_parser  # Импортируем функцию парсинга
 
-def rss_parser(posted_q, n_test_chars, send_message_func=None):
-    '''Синхронный парсер rss ленты'''
-    rss_link = 'https://rssexport.rbc.ru/rbcnews/news/10/full.rss'
+def load_model():
+    return joblib.load('MyLogisticRegression.joblib')  # Загружаем модель из файла
 
-    count = 50
-    while count:
-        count -= 1
-        try:
-            response = requests.get(rss_link)
-            feed = feedparser.parse(response.text)
-
-            for entry in feed.entries[::-1]:
-                summary = entry['summary']
-                title = entry['title']
-                news_text = f'{title}\n{summary}'
-                head = news_text[:n_test_chars].strip()
-
-                if head in posted_q:
-                    continue
-
-                if send_message_func is None:
-                    st.write(news_text)  # Отображаем новость на странице Streamlit
-                else:
-                    send_message_func(f'rbc.ru\n{news_text}')
-
-                posted_q.appendleft(head)
-
-        except Exception as e:
-            st.error(f"Ошибка: {e}")  # Отображаем ошибку на странице Streamlit
-
-        time.sleep(5)
+def predict_categories(model, news_titles):
+    return model.predict(news_titles)
 
 def main():
-    st.title("Новости RBC")
-    posted_q = deque(maxlen=100)  # Ограничиваем размер очереди
-    n_test_chars = 100  # Количество символов для проверки уникальности новости
+    # Очередь из уже опубликованных постов, чтобы их не дублировать
+    posted_q = deque(maxlen=90)
+    n_test_chars = 100
+    new_entries = []
 
-    # Запускаем парсер
-    rss_parser(posted_q, n_test_chars)
+    # Загружаем модель
+    model = load_model()  # Загрузка модели
+
+    # Запускаем функцию парсинга. Используем отдельный поток.
+    thread = threading.Thread(target=rss_parser, args=(posted_q, n_test_chars, new_entries), daemon=True)
+    thread.start()
+
+    # Заголовок в Streamlit
+    st.title("Актуальные новости")
+
+    # Создаем два столбца для выравнивания элементов
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Выпадающий список для выбора источника
+        source = st.selectbox("Выберите источник новостей", ["RBC", "BCS"])
+
+    with col2:
+        # Выпадающий список фильтрации по категориям будет определен позже
+        category_placeholder = st.selectbox("Фильтр по категории", ["Все"] + list(model.classes_))
+
+    st.subheader(f"Последние новости {source}:")
+
+    # Создаем множество для уникальности отображаемых записей
+    displayed_entries_set = set()  # Множество для уникальных идентификаторов
+    displayed_entries = []  # Список для отображаемых новостей
+
+    # Создаем контейнер для таблицы, чтобы обновлять его
+    table_container = st.empty()
+
+    # Флаг для проверки, были ли хоть какие-то новости
+    has_news = False
+
+    # Отображаем новые новости в табличном формате
+    while True:
+        # Проверяем, есть ли новые записи
+        if new_entries:
+            # Получаем последние 90 новостей
+            latest_entries = new_entries[-90:]
+
+            # Обновляем отображаемые записи
+            for news in latest_entries:
+                # Создаем уникальный идентификатор для новости
+                news_id = f"{news['Заголовок']} | {news['Описание'][:100]} | {news['Ссылка']}"  # Заголовок + часть описания
+                
+                # Если новости нет в отображаемых записях, добавляем ее
+                if news_id not in displayed_entries_set:
+                    displayed_entries.append(news)
+                    displayed_entries_set.add(news_id)
+                    has_news = True  # Нам удалось добавить новость
+
+            # Ограничиваем длину списка отображаемых новостей до 50
+            displayed_entries = displayed_entries[-90:]
+
+            # Выполняем предсказание категорий
+            if has_news:
+                titles = pd.Series([entry['Заголовок'] for entry in displayed_entries])
+                categories = predict_categories(model, titles)
+
+                # Добавляем категории в отображаемые записи
+                for i in range(len(displayed_entries)):
+                    displayed_entries[i]['Категория'] = categories[i]
+
+                # Обновляем выпадающий список категорий в соответствии с уникальными категориями
+                unique_categories = pd.Series(categories).unique()
+
+                # Фильтрация новостей по выбранной категории
+                if category_placeholder != "Все":
+                    displayed_entries = [entry for entry in displayed_entries if entry['Категория'] == category_placeholder]
+
+            # Обновляем содержимое таблицы в контейнере
+            with table_container:
+                table_container.table(displayed_entries)
+
+        else:
+            # Первоначальная инициализация; убираем сообщение о пустых новостях
+            if has_news:
+                table_container.write("Нет доступных новостей.")
+
+        # Принудительное обновление, чтобы сразу не ждать таймера
+        if not has_news:
+            pass  # Просто ничего не делаем, если еще нет новостей
+        else:
+            with st.spinner("Обновление новостей..."):
+                threading.Event().wait(60)  # Обновляем новости каждые 60 секунд
 
 if __name__ == "__main__":
     main()
