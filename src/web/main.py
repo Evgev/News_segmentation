@@ -1,17 +1,21 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 # Загрузка данных
 @st.cache_data
 def load_data():
-    source_data = pd.read_excel("/mnt/d/Desktop/Projects/diploma/news_segmentation/src/tests/lenta_ru_2025_03_16-2025_03_17.xlsx")
+    source_data = pd.read_excel("/root/News_segmentation/data/lenta_ru_2025_03_14-2025_03_17.xlsx")
     return source_data
 
 # Сегментация новостей по категориям
 def segment_news(source_data, categories):
+    # Удаляем строки с NaN в столбце 'Текст новости'
+    source_data = source_data.dropna(subset=['Текст новости'])
+    
     vectorizer = TfidfVectorizer()
     source_vectors = vectorizer.fit_transform(source_data['Текст новости'])
     category_vectors = vectorizer.transform(categories)
@@ -67,11 +71,32 @@ def main():
         
         # Построение графика
         st.write(f"Распределение новостей по категории '{selected_category}' во времени:")
-        fig, ax = plt.subplots()
-        ax.plot(filtered_daily_counts['Дата'], filtered_daily_counts['Количество статей'], marker='o')
-        ax.set_xlabel('Дата')
-        ax.set_ylabel('Количество новостей')
-        ax.set_title(f"Распределение новостей по категории '{selected_category}'")
+        
+        # Создание графика
+        fig, ax = plt.subplots(figsize=(10, 6))  # Увеличиваем размер графика
+        
+        # Настройка стиля графика
+        ax.plot(filtered_daily_counts['Дата'], filtered_daily_counts['Количество статей'], 
+                marker='o', linestyle='-', color='b', linewidth=2, markersize=8, label='Количество статей')
+        
+        # Настройка оси X (даты)
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))  # Формат даты
+        ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))  # Интервал между датами
+        plt.xticks(rotation=45)  # Поворот подписей дат на 45 градусов
+        
+        # Настройка осей и сетки
+        ax.set_xlabel('Дата', fontsize=12)
+        ax.set_ylabel('Количество статей', fontsize=12)
+        ax.set_title(f"Распределение новостей по категории '{selected_category}'", fontsize=14)
+        ax.grid(True, linestyle='--', alpha=0.7)  # Добавляем сетку
+        
+        # Легенда
+        ax.legend(fontsize=12)
+        
+        # Улучшение читаемости
+        plt.tight_layout()  # Автоматическая настройка отступов
+        
+        # Отображение графика в Streamlit
         st.pyplot(fig)
 
 if __name__ == "__main__":
