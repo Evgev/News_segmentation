@@ -1,3 +1,5 @@
+scrapy
+joblib
 feedparser
 httpx
 torch
@@ -7,6 +9,7 @@ asyncio
 aiohttp
 matplotlib
 streamlit
+tensorflow
 scikit-learn == 1.6.1
 gensim == 4.3.3
 ipykernel == 6.29.5
