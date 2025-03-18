@@ -8,7 +8,7 @@ async def rss_parser(httpx_client, posted_q,
                      n_test_chars, send_message_func=None):
     '''Парсер rss ленты'''
 
-    rss_link = 'https://rssexport.rbc.ru/rbcnews/news/20/full.rss'
+    rss_link = 'https://rssexport.rbc.ru/rbcnews/news/90/full.rss'
 
     while True:
         try:
@@ -43,10 +43,10 @@ async def rss_parser(httpx_client, posted_q,
 if __name__ == "__main__":
 
     # Очередь из уже опубликованных постов, чтобы их не дублировать
-    posted_q = deque(maxlen=20)
+    posted_q = deque(maxlen=90)
 
     # 50 первых символов от текста новости - это ключ для проверки повторений
-    n_test_chars = 50
+    n_test_chars = 100
 
     httpx_client = httpx.AsyncClient()
 

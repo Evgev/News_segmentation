@@ -4,6 +4,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.pipeline import Pipeline
+import joblib
 
 # Загрузка данных
 data = pd.read_excel('/root/News_segmentation/data/lenta_ru_2024_03_19-2025_03_18_without_bodies.xlsx')  # Предположим, что данные хранятся в CSV файле
@@ -45,15 +46,6 @@ y_pred = model.predict(X_test)
 print("Accuracy:", accuracy_score(y_test, y_pred))
 print("\nClassification Report:\n", classification_report(y_test, y_pred))
 
-# # Применение модели к неразмеченным данным
-# unlabeled_data = pd.read_csv('unlabeled_news.csv')  # Загрузка неразмеченных данных
-# unlabeled_X = unlabeled_data['заголовок']
-
-# # Предсказание категорий для неразмеченных данных
-# predicted_categories = model.predict(unlabeled_X)
-
-# # Добавление предсказанных категорий в DataFrame
-# unlabeled_data['предсказанная_категория'] = predicted_categories
-
-# # Сохранение результатов
-# unlabeled_data.to_csv('labeled_news.csv', index=False)
+# Сохранение модели в файл
+joblib.dump(model, 'MyLogisticRegression.joblib')
+print("Модель сохранена в файл 'MyLogisticRegression.joblib'")
