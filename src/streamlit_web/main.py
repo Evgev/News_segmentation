@@ -11,6 +11,10 @@ import streamlit as st
 import threading
 from collections import deque
 from rbc_parser import rss_parser  # Импортируем функцию парсинга
+from bcs_parser import bcs_parser  # Импортируем функцию парсинга
+
+st.set_page_config(layout="wide")
+
 
 def load_model():
     return joblib.load('MyLogisticRegression.joblib')  # Загружаем модель из файла
@@ -19,6 +23,7 @@ def predict_categories(model, news_titles):
     return model.predict(news_titles)
 
 def main():
+    
     # Очередь из уже опубликованных постов, чтобы их не дублировать
     posted_q = deque(maxlen=90)
     n_test_chars = 100
@@ -27,9 +32,6 @@ def main():
     # Загружаем модель
     model = load_model()  # Загрузка модели
 
-    # Запускаем функцию парсинга. Используем отдельный поток.
-    thread = threading.Thread(target=rss_parser, args=(posted_q, n_test_chars, new_entries), daemon=True)
-    thread.start()
 
     # Заголовок в Streamlit
     st.title("Актуальные новости")
@@ -44,6 +46,14 @@ def main():
     with col2:
         # Выпадающий список фильтрации по категориям будет определен позже
         category_placeholder = st.selectbox("Фильтр по категории", ["Все"] + list(model.classes_))
+        
+    
+    # Запускаем функцию парсинга. Используем отдельный поток.
+    if source == "RBC":
+        thread = threading.Thread(target=rss_parser, args=(posted_q, n_test_chars, new_entries), daemon=True)
+    elif source == "BCS": 
+        thread = threading.Thread(target=bcs_parser, args=(posted_q, n_test_chars, new_entries), daemon=True)
+    thread.start()
 
     st.subheader(f"Последние новости {source}:")
 
